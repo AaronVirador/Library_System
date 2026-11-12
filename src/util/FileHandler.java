@@ -36,10 +36,13 @@ public class FileHandler {
                 while ((line = reader.readLine()) != null) {
                     if (line.trim().isEmpty()) continue;
 
+                    // Old lines have 4 parts; newer lines have a 5th part: who borrowed the book.
+                    // (split() drops an empty last part, so "Available" lines may still have only 4.)
                     String[] parts = line.split(AppConstants.DELIMITER);
-                    if (parts.length == 4) {
+                    if (parts.length == 4 || parts.length == 5) {
                         int id = Integer.parseInt(parts[0].trim());
-                        books.add(new Book(id, parts[1].trim(), parts[2].trim(), parts[3].trim()));
+                        String borrowedBy = parts.length == 5 ? parts[4].trim() : "";
+                        books.add(new Book(id, parts[1].trim(), parts[2].trim(), parts[3].trim(), borrowedBy));
                     }
                 }
             }

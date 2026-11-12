@@ -35,6 +35,7 @@ public class AuthService {
         if (username.length() < 3) return "Username must be at least 3 characters.";
         if (username.contains(AppConstants.DELIMITER) || username.contains(" "))
             return "Username can't contain spaces or commas.";
+        if (username.equalsIgnoreCase(AppConstants.ADMIN_USERNAME)) return "That username is reserved.";
         if (findUser(username) != null) return "That username is already taken.";
         if (password.length() < 6) return "Password must be at least 6 characters.";
         if (!password.equals(confirm)) return "Passwords do not match.";
@@ -43,6 +44,17 @@ public class AuthService {
         users.add(new User(username, PasswordUtil.hash(password), question, hashAnswer(answer)));
         FileHandler.saveUsers(users);
         return null;
+    }
+
+    // The username exactly as it was saved at sign-up (so "MARIA" and "maria" count as the same student)
+    public String getStoredUsername(String username) {
+        User user = findUser(username);
+        return user == null ? username : user.getUsername();
+    }
+
+    // The admin has one fixed account; only the password is typed
+    public boolean adminLogin(String password) {
+        return PasswordUtil.hash(password).equals(AppConstants.ADMIN_PASSWORD_HASH);
     }
 
     public boolean login(String username, String password) {

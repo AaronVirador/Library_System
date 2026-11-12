@@ -14,21 +14,33 @@ import javax.swing.table.JTableHeader;
 import javax.swing.table.TableCellRenderer;
 import java.awt.*;
 import java.awt.geom.RoundRectangle2D;
+import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * The main window. The admin sees every book and who borrowed it, and can add and
+ * delete books. A student can search, borrow and return books.
+ */
 public class LibraryGUI extends JFrame {
 
     private static final Color ROW_LINE = new Color(240, 242, 245);
 
+    private static final String FILTER_ALL = "All";
+    private static final String FILTER_AVAILABLE = "Available";
+    private static final String FILTER_BORROWED = "Borrowed";
+
+    private final String username;
+    private final boolean admin;
     private LibraryService service = new LibraryService();
 
-    private JTextField titleField = Theme.withHint(Theme.textField(), "Book title");
-    private JTextField authorField = Theme.withHint(Theme.textField(), "Author name");
-    private JTextField searchField = Theme.withHint(Theme.textField(), "Search by title or author...");
+    private JTextField titleField;
+    private JTextField authorField;
+    private JTextField searchField;
 
     private DefaultTableModel tableModel;
     private JTable table;
     private JLabel countLabel = new JLabel(" ");
+    private String filter = FILTER_ALL;
 
     // Summary numbers at the top
     private JLabel totalValue = statValue();
@@ -39,10 +51,19 @@ public class LibraryGUI extends JFrame {
     private Toast toast = new Toast();
     private Timer toastTimer;
 
-    public LibraryGUI() {
-        setTitle("Library System");
-        setSize(1060, 800);
-        setMinimumSize(new Dimension(920, 680));
+    public LibraryGUI(String username, boolean admin) {
+        this.username = username;
+        this.admin = admin;
+
+        titleField = Theme.withHint(Theme.textField(), "Book title");
+        authorField = Theme.withHint(Theme.textField(), "Author name");
+        searchField = Theme.withHint(Theme.textField(), admin
+                ? "Search title, author or borrower..."
+                : "Search by title or author...");
+
+        setTitle(admin ? "Library System - Admin" : "Library System");
+        setSize(1100, admin ? 840 : 760);
+        setMinimumSize(new Dimension(940, 680));
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
@@ -51,7 +72,7 @@ public class LibraryGUI extends JFrame {
         add(createHeader(), BorderLayout.NORTH);
         add(createBody(), BorderLayout.CENTER);
 
-        refreshTable(service.getAllBooks());
+        refreshTable();
     }
 
     // ---------- HEADER ----------
@@ -87,9 +108,13 @@ public class LibraryGUI extends JFrame {
         logout.setPreferredSize(new Dimension(100, 38));
         logout.addActionListener(e -> logout());
 
-        JPanel right = new JPanel(new GridBagLayout()); // centers the button vertically
+        JPanel right = new JPanel(new GridBagLayout()); // centers things vertically
         right.setOpaque(false);
-        right.add(logout);
+        GridBagConstraints c = new GridBagConstraints();
+        c.insets = new Insets(0, 0, 0, 18);
+        right.add(createUserChip(), c);
+        c.insets = new Insets(0, 0, 0, 0);
+        right.add(logout, c);
 
         header.add(left, BorderLayout.WEST);
         header.add(right, BorderLayout.EAST);
@@ -114,6 +139,46 @@ public class LibraryGUI extends JFrame {
         return wrapper;
     }
 
+    // Round avatar with the first letter + name + role
+    private JPanel createUserChip() {
+        JComponent avatar = new JComponent() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = Theme.smooth(g);
+                g2.setColor(admin ? Theme.GOLD : Theme.PRIMARY_SOFT);
+                g2.fillOval(0, 0, getWidth(), getHeight());
+                g2.setColor(admin ? new Color(113, 63, 18) : Theme.PRIMARY);
+                g2.setFont(Theme.font(Font.BOLD, 15));
+                FontMetrics fm = g2.getFontMetrics();
+                String letter = username.isEmpty() ? "?" : username.substring(0, 1).toUpperCase();
+                g2.drawString(letter, (getWidth() - fm.stringWidth(letter)) / 2,
+                        (getHeight() + fm.getAscent() - fm.getDescent()) / 2);
+                g2.dispose();
+            }
+        };
+        avatar.setPreferredSize(new Dimension(38, 38));
+
+        JLabel name = new JLabel(username);
+        name.setFont(Theme.font(Font.BOLD, 13));
+        name.setForeground(Theme.TEXT);
+
+        JLabel role = new JLabel(admin ? "Administrator" : "Student");
+        role.setFont(Theme.font(Font.PLAIN, 11));
+        role.setForeground(admin ? Theme.WARNING_TEXT : Theme.MUTED);
+
+        JPanel text = new JPanel();
+        text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
+        text.setOpaque(false);
+        text.add(name);
+        text.add(role);
+
+        JPanel chip = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        chip.setOpaque(false);
+        chip.add(avatar);
+        chip.add(text);
+        return chip;
+    }
+
     // ---------- BODY ----------
 
     private JPanel createBody() {
@@ -125,12 +190,14 @@ public class LibraryGUI extends JFrame {
         top.setLayout(new BoxLayout(top, BoxLayout.Y_AXIS));
         top.setOpaque(false);
         JComponent stats = createStats();
-        JComponent add = createAddCard();
         stats.setAlignmentX(Component.LEFT_ALIGNMENT);
-        add.setAlignmentX(Component.LEFT_ALIGNMENT);
         top.add(stats);
-        top.add(Box.createVerticalStrut(16));
-        top.add(add);
+        if (admin) { // only the admin can add books
+            JComponent add = createAddCard();
+            add.setAlignmentX(Component.LEFT_ALIGNMENT);
+            top.add(Box.createVerticalStrut(16));
+            top.add(add);
+        }
 
         body.add(top, BorderLayout.NORTH);
         body.add(createTableCard(), BorderLayout.CENTER);
@@ -146,7 +213,8 @@ public class LibraryGUI extends JFrame {
         row.setPreferredSize(new Dimension(0, 84));
         row.add(statCard("Total books", totalValue, Theme.ACCENT, Theme.ACCENT_SOFT));
         row.add(statCard("Available", availableValue, Theme.SUCCESS, Theme.PRIMARY_SOFT));
-        row.add(statCard("Borrowed", borrowedValue, Theme.WARNING_TEXT, Theme.WARNING_BG));
+        row.add(statCard(admin ? "Borrowed" : "Borrowed by you", borrowedValue,
+                Theme.WARNING_TEXT, Theme.WARNING_BG));
         return row;
     }
 
@@ -195,7 +263,7 @@ public class LibraryGUI extends JFrame {
         return card;
     }
 
-    // Card with the "add book" form
+    // Card with the "add book" form (admin only)
     private JComponent createAddCard() {
         JPanel card = Theme.card(new GridBagLayout());
         card.setBorder(new EmptyBorder(16, 20, 18, 20));
@@ -224,28 +292,43 @@ public class LibraryGUI extends JFrame {
         return card;
     }
 
-    // Card holding the search bar, the table and the book count
+    // Card holding the filters, search bar, table and book count
     private JPanel createTableCard() {
         JPanel card = Theme.card(new BorderLayout());
 
-        // search bar
-        searchField.setPreferredSize(new Dimension(340, 40));
-        searchField.getDocument().addDocumentListener(new DocumentListener() { // live search
-            public void insertUpdate(DocumentEvent e) { searchBooks(); }
-            public void removeUpdate(DocumentEvent e) { searchBooks(); }
-            public void changedUpdate(DocumentEvent e) { searchBooks(); }
-        });
-
-        JButton clearButton = Theme.outlineButton("Show All");
-        clearButton.setPreferredSize(new Dimension(100, 40));
-        clearButton.addActionListener(e -> {
-            searchField.setText("");
-            refreshTable(service.getAllBooks());
-        });
-
+        // title + filter chips
         JLabel tableTitle = new JLabel("Books");
         tableTitle.setFont(Theme.font(Font.BOLD, 16));
         tableTitle.setForeground(Theme.TEXT);
+
+        JPanel leftBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        leftBar.setOpaque(false);
+        leftBar.add(tableTitle);
+        leftBar.add(Box.createHorizontalStrut(10));
+
+        ButtonGroup group = new ButtonGroup();
+        for (String name : new String[]{FILTER_ALL, FILTER_AVAILABLE, FILTER_BORROWED}) {
+            JToggleButton chip = Theme.chip(name);
+            chip.addActionListener(e -> {
+                filter = name;
+                refreshTable();
+            });
+            group.add(chip);
+            leftBar.add(chip);
+            if (name.equals(FILTER_ALL)) chip.setSelected(true);
+        }
+
+        // search bar
+        searchField.setPreferredSize(new Dimension(300, 40));
+        searchField.getDocument().addDocumentListener(new DocumentListener() { // live search
+            public void insertUpdate(DocumentEvent e) { refreshTable(); }
+            public void removeUpdate(DocumentEvent e) { refreshTable(); }
+            public void changedUpdate(DocumentEvent e) { refreshTable(); }
+        });
+
+        JButton clearButton = Theme.outlineButton("Clear");
+        clearButton.setPreferredSize(new Dimension(80, 40));
+        clearButton.addActionListener(e -> searchField.setText(""));
 
         JPanel searchBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         searchBar.setOpaque(false);
@@ -255,7 +338,7 @@ public class LibraryGUI extends JFrame {
         JPanel toolbar = new JPanel(new BorderLayout());
         toolbar.setOpaque(false);
         toolbar.setBorder(new EmptyBorder(16, 20, 14, 10));
-        toolbar.add(tableTitle, BorderLayout.WEST);
+        toolbar.add(leftBar, BorderLayout.WEST);
         toolbar.add(searchBar, BorderLayout.EAST);
 
         // footer with the count
@@ -274,11 +357,19 @@ public class LibraryGUI extends JFrame {
 
     // Table of books
     private JScrollPane createTable() {
-        String[] columns = {"ID", "TITLE", "AUTHOR", "STATUS"};
+        String[] columns = admin
+                ? new String[]{"ID", "TITLE", "AUTHOR", "STATUS", "BORROWED BY"}
+                : new String[]{"ID", "TITLE", "AUTHOR", "STATUS"};
+
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
                 return false; // table is view-only
+            }
+
+            @Override
+            public Class<?> getColumnClass(int column) {
+                return column == 0 ? Integer.class : String.class; // so IDs sort as numbers
             }
         };
 
@@ -297,6 +388,7 @@ public class LibraryGUI extends JFrame {
                 }
             }
         };
+        table.setAutoCreateRowSorter(true); // click a column title to sort
         table.setRowHeight(46);
         table.setFont(Theme.font(Font.PLAIN, 14));
         table.setShowVerticalLines(false);
@@ -307,25 +399,39 @@ public class LibraryGUI extends JFrame {
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         table.setSelectionBackground(Theme.PRIMARY_SOFT);
         table.setSelectionForeground(Theme.TEXT);
-        table.setFocusable(true);
+
         table.getColumnModel().getColumn(0).setMinWidth(70);
         table.getColumnModel().getColumn(0).setMaxWidth(80);
         table.getColumnModel().getColumn(0).setPreferredWidth(70);
-        table.getColumnModel().getColumn(3).setMinWidth(150);
-        table.getColumnModel().getColumn(3).setMaxWidth(180);
-        table.getColumnModel().getColumn(3).setPreferredWidth(160);
+        table.getColumnModel().getColumn(3).setMinWidth(160);
+        table.getColumnModel().getColumn(3).setMaxWidth(190);
+        table.getColumnModel().getColumn(3).setPreferredWidth(170);
+        if (admin) {
+            table.getColumnModel().getColumn(4).setMinWidth(150);
+            table.getColumnModel().getColumn(4).setMaxWidth(220);
+            table.getColumnModel().getColumn(4).setPreferredWidth(190);
+        }
 
-        // Header style
+        // Header style (with a small arrow on the sorted column)
         JTableHeader header = table.getTableHeader();
         header.setReorderingAllowed(false);
         header.setResizingAllowed(false);
         header.setPreferredSize(new Dimension(0, 40));
+        header.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         header.setDefaultRenderer(new DefaultTableCellRenderer() {
             @Override
             public Component getTableCellRendererComponent(JTable t, Object value,
                     boolean isSelected, boolean hasFocus, int row, int col) {
                 JLabel label = (JLabel) super.getTableCellRendererComponent(
                         t, value, false, false, row, col);
+                String text = String.valueOf(value);
+                if (t.getRowSorter() != null && !t.getRowSorter().getSortKeys().isEmpty()) {
+                    RowSorter.SortKey key = t.getRowSorter().getSortKeys().get(0);
+                    if (key.getColumn() == t.convertColumnIndexToModel(col)) {
+                        text += key.getSortOrder() == SortOrder.ASCENDING ? "  ▲" : "  ▼";
+                    }
+                }
+                label.setText(text);
                 label.setOpaque(true);
                 label.setBackground(new Color(249, 250, 251));
                 label.setForeground(Theme.MUTED);
@@ -338,20 +444,29 @@ public class LibraryGUI extends JFrame {
         });
 
         // Row style
-        table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+        DefaultTableCellRenderer rowRenderer = new DefaultTableCellRenderer() {
             @Override
             public Component getTableCellRendererComponent(JTable t, Object value,
                     boolean isSelected, boolean hasFocus, int row, int col) {
                 JLabel label = (JLabel) super.getTableCellRendererComponent(
                         t, value, isSelected, false, row, col);
                 label.setBorder(new EmptyBorder(0, 20, 0, 12));
+                label.setHorizontalAlignment(SwingConstants.LEFT); // numbers default to the right
                 label.setFont(Theme.font(col == 1 ? Font.BOLD : Font.PLAIN, 14));
                 label.setForeground(col == 0 || col == 2 ? Theme.MUTED : Theme.TEXT);
-                if (isSelected) label.setForeground(Theme.TEXT);
                 label.setBackground(isSelected ? Theme.PRIMARY_SOFT : Color.WHITE);
+
+                if (col == 4) { // "borrowed by" column (admin)
+                    boolean empty = value == null || value.toString().isEmpty();
+                    label.setText(empty ? "—" : value.toString());
+                    label.setForeground(empty ? new Color(156, 163, 175) : Theme.TEXT);
+                    if (!empty) label.setFont(Theme.font(Font.BOLD, 14));
+                }
                 return label;
             }
-        });
+        };
+        table.setDefaultRenderer(Object.class, rowRenderer);
+        table.setDefaultRenderer(Integer.class, rowRenderer); // the ID column holds numbers
         table.getColumnModel().getColumn(3).setCellRenderer(new StatusRenderer());
 
         JScrollPane scrollPane = new JScrollPane(table);
@@ -361,7 +476,7 @@ public class LibraryGUI extends JFrame {
         return scrollPane;
     }
 
-    // Shows "Available" / "Borrowed" as a small colored pill
+    // Shows the status as a small colored pill
     private static class StatusRenderer implements TableCellRenderer {
         private final JPanel panel = new JPanel(new GridBagLayout());
         private final Pill pill = new Pill();
@@ -369,6 +484,7 @@ public class LibraryGUI extends JFrame {
         StatusRenderer() {
             GridBagConstraints c = new GridBagConstraints();
             c.anchor = GridBagConstraints.WEST;
+            c.weightx = 1.0; // without this the pill floats to the middle of the cell
             c.insets = new Insets(0, 20, 0, 0);
             panel.add(pill, c);
         }
@@ -376,7 +492,7 @@ public class LibraryGUI extends JFrame {
         @Override
         public Component getTableCellRendererComponent(JTable t, Object value,
                 boolean isSelected, boolean hasFocus, int row, int col) {
-            boolean available = "Available".equals(value);
+            boolean available = FILTER_AVAILABLE.equals(value);
             pill.set(String.valueOf(value),
                     available ? Theme.PRIMARY_SOFT : Theme.WARNING_BG,
                     available ? Theme.SUCCESS : Theme.WARNING_TEXT);
@@ -410,7 +526,7 @@ public class LibraryGUI extends JFrame {
         }
     }
 
-    // Message pill + borrow / return buttons
+    // Message pill + action buttons
     private JPanel createBottomPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setOpaque(false);
@@ -418,16 +534,23 @@ public class LibraryGUI extends JFrame {
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         buttons.setOpaque(false);
 
-        JButton returnButton = Theme.outlineButton("Return Selected");
-        returnButton.setPreferredSize(new Dimension(150, 42));
-        returnButton.addActionListener(e -> returnSelected());
+        if (admin) {
+            JButton deleteButton = Theme.dangerButton("Delete Selected");
+            deleteButton.setPreferredSize(new Dimension(160, 42));
+            deleteButton.addActionListener(e -> deleteSelected());
+            buttons.add(deleteButton);
+        } else {
+            JButton returnButton = Theme.outlineButton("Return Selected");
+            returnButton.setPreferredSize(new Dimension(150, 42));
+            returnButton.addActionListener(e -> returnSelected());
 
-        JButton borrowButton = Theme.primaryButton("Borrow Selected");
-        borrowButton.setPreferredSize(new Dimension(160, 42));
-        borrowButton.addActionListener(e -> borrowSelected());
+            JButton borrowButton = Theme.primaryButton("Borrow Selected");
+            borrowButton.setPreferredSize(new Dimension(160, 42));
+            borrowButton.addActionListener(e -> borrowSelected());
 
-        buttons.add(returnButton);
-        buttons.add(borrowButton);
+            buttons.add(returnButton);
+            buttons.add(borrowButton);
+        }
 
         JPanel toastWrap = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         toastWrap.setOpaque(false);
@@ -489,13 +612,9 @@ public class LibraryGUI extends JFrame {
         toastTimer.start();
     }
 
-    // The service returns plain text, so pick the toast color from its wording
+    // LibraryService success messages start with "You " or "Deleted"; anything else is a problem
     private int kindOf(String message) {
-        String m = message.toLowerCase();
-        boolean failed = m.contains("already") || m.contains("not ") || m.contains("cannot")
-                || m.contains("can't") || m.contains("invalid") || m.contains("fail")
-                || m.contains("unable") || m.contains("error");
-        return failed ? ERROR : SUCCESS;
+        return message.startsWith("You ") || message.startsWith("Deleted") ? SUCCESS : ERROR;
     }
 
     // ---------- ACTIONS ----------
@@ -507,24 +626,19 @@ public class LibraryGUI extends JFrame {
         if (service.addBook(title, author)) {
             titleField.setText("");
             authorField.setText("");
-            refreshTable(service.getAllBooks());
+            refreshTable();
             showToast("Book added to the library.", SUCCESS);
         } else {
             showToast("Fields can't be empty or contain commas.", ERROR);
         }
     }
 
-    private void searchBooks() {
-        String query = searchField.getText().trim();
-        refreshTable(query.isEmpty() ? service.getAllBooks() : service.searchBooks(query));
-    }
-
     private void borrowSelected() {
         int id = getSelectedBookId();
         if (id == -1) return;
 
-        String result = service.borrowBook(id);
-        refreshTable(currentList());
+        String result = service.borrowBook(id, username);
+        refreshTable();
         selectBook(id);
         showToast(result, kindOf(result));
     }
@@ -533,21 +647,38 @@ public class LibraryGUI extends JFrame {
         int id = getSelectedBookId();
         if (id == -1) return;
 
-        String result = service.returnBook(id);
-        refreshTable(currentList());
+        String result = service.returnBook(id, username);
+        refreshTable();
         selectBook(id);
+        showToast(result, kindOf(result));
+    }
+
+    private void deleteSelected() {
+        int id = getSelectedBookId();
+        if (id == -1) return;
+
+        int modelRow = table.convertRowIndexToModel(table.getSelectedRow());
+        String title = String.valueOf(tableModel.getValueAt(modelRow, 1));
+
+        // A borrowed book can't be deleted, so say so before asking "are you sure?"
+        if (!FILTER_AVAILABLE.equals(tableModel.getValueAt(modelRow, 3))) {
+            String who = String.valueOf(tableModel.getValueAt(modelRow, 4));
+            showToast("Can't delete: this book is borrowed" + (who.isEmpty() ? "." : " by " + who + "."), ERROR);
+            return;
+        }
+
+        boolean sure = ConfirmDialog.ask(this, "Delete this book?",
+                "\"" + title + "\" will be permanently removed from the library.", "Delete");
+        if (!sure) return;
+
+        String result = service.deleteBook(id);
+        refreshTable();
         showToast(result, kindOf(result));
     }
 
     private void logout() {
         dispose();
         new LoginFrame().setVisible(true);
-    }
-
-    // Keeps the current search results after borrowing / returning
-    private List<Book> currentList() {
-        String query = searchField.getText().trim();
-        return query.isEmpty() ? service.getAllBooks() : service.searchBooks(query);
     }
 
     // Gets the ID of the highlighted row, or -1 if nothing is selected
@@ -557,34 +688,59 @@ public class LibraryGUI extends JFrame {
             showToast("Please select a book first.", INFO);
             return -1;
         }
-        return (int) tableModel.getValueAt(row, 0);
+        return (int) tableModel.getValueAt(table.convertRowIndexToModel(row), 0);
     }
 
+    // Highlights the row of a book (if it is still in the list)
     private void selectBook(int id) {
-        for (int row = 0; row < tableModel.getRowCount(); row++) {
-            if ((int) tableModel.getValueAt(row, 0) == id) {
-                table.setRowSelectionInterval(row, row);
+        for (int modelRow = 0; modelRow < tableModel.getRowCount(); modelRow++) {
+            if ((int) tableModel.getValueAt(modelRow, 0) == id) {
+                int viewRow = table.convertRowIndexToView(modelRow);
+                if (viewRow >= 0) table.setRowSelectionInterval(viewRow, viewRow);
                 return;
             }
         }
     }
 
-    private void refreshTable(List<Book> books) {
+    // Books that match the search box and the All / Available / Borrowed filter
+    private List<Book> visibleBooks() {
+        String query = searchField.getText().trim();
+        List<Book> base = query.isEmpty() ? service.getAllBooks() : service.searchBooks(query, admin);
+        if (filter.equals(FILTER_ALL)) return base;
+
+        List<Book> result = new ArrayList<>();
+        for (Book book : base) {
+            if (book.getStatus().equals(filter)) result.add(book);
+        }
+        return result;
+    }
+
+    private void refreshTable() {
+        List<Book> books = visibleBooks();
+
         tableModel.setRowCount(0); // clear the table
         for (Book book : books) {
-            tableModel.addRow(new Object[]{
-                    book.getId(), book.getTitle(), book.getAuthor(), book.getStatus()
-            });
+            String status = book.getStatus();
+            // a student sees which borrowed books are their own
+            if (!admin && FILTER_BORROWED.equals(status) && book.getBorrowedBy().equalsIgnoreCase(username)) {
+                status = "Borrowed by you";
+            }
+            if (admin) {
+                tableModel.addRow(new Object[]{book.getId(), book.getTitle(), book.getAuthor(),
+                        status, book.getBorrowedBy()});
+            } else {
+                tableModel.addRow(new Object[]{book.getId(), book.getTitle(), book.getAuthor(), status});
+            }
         }
 
         List<Book> all = service.getAllBooks();
         int available = 0;
         for (Book book : all) {
-            if ("Available".equals(book.getStatus())) available++;
+            if (FILTER_AVAILABLE.equals(book.getStatus())) available++;
         }
         totalValue.setText(String.valueOf(all.size()));
         availableValue.setText(String.valueOf(available));
-        borrowedValue.setText(String.valueOf(all.size() - available));
+        borrowedValue.setText(String.valueOf(admin ? all.size() - available : service.countBorrowedBy(username)));
         countLabel.setText("Showing " + books.size() + " of " + all.size() + " books");
     }
 }

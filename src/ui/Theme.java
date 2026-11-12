@@ -183,7 +183,7 @@ public class Theme {
             g2.setColor(new Color(PRIMARY.getRed(), PRIMARY.getGreen(), PRIMARY.getBlue(), 40));
             g2.fill(new RoundRectangle2D.Float(0, 0, w, h, 14, 14));
         }
-        g2.setColor(field.isEditable() ? Color.WHITE : new Color(243, 244, 246));
+        g2.setColor(field.isEditable() && field.isEnabled() ? Color.WHITE : new Color(243, 244, 246));
         g2.fill(new RoundRectangle2D.Float(1.5f, 1.5f, w - 3, h - 3, 11, 11));
         g2.setColor(focused ? PRIMARY : BORDER);
         g2.setStroke(new BasicStroke(1.2f));
@@ -228,9 +228,10 @@ public class Theme {
                 Graphics2D g2 = smooth(g);
                 Color base = hover ? fillHover : fill;
                 if (getModel().isPressed()) base = base.darker();
+                if (!isEnabled()) base = new Color(229, 231, 235);
                 g2.setColor(base);
                 g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 12, 12));
-                if (outline != null) {
+                if (outline != null && isEnabled()) {
                     g2.setColor(outline);
                     g2.setStroke(new BasicStroke(1.2f));
                     g2.draw(new RoundRectangle2D.Float(0.6f, 0.6f, getWidth() - 1.2f, getHeight() - 1.2f, 12, 12));
@@ -266,6 +267,49 @@ public class Theme {
     public static JButton ghostButton(String text) {
         return roundedButton(text, new Color(255, 255, 255, 0), new Color(255, 255, 255, 30),
                 Color.WHITE, new Color(255, 255, 255, 110));
+    }
+
+    /** White button with red text, for risky actions such as delete. */
+    public static JButton dangerButton(String text) {
+        return roundedButton(text, Color.WHITE, new Color(254, 242, 242), ERROR, new Color(252, 165, 165));
+    }
+
+    /** Solid red button for confirming a risky action. */
+    public static JButton dangerSolidButton(String text) {
+        return roundedButton(text, ERROR, new Color(185, 28, 28), Color.WHITE, null);
+    }
+
+    /** Small pill-shaped toggle used for filters (use inside a ButtonGroup). */
+    public static JToggleButton chip(String text) {
+        JToggleButton button = new JToggleButton(text) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = smooth(g);
+                boolean on = isSelected();
+                int w = getWidth(), h = getHeight();
+                g2.setColor(on ? PRIMARY : (getModel().isRollover() ? PRIMARY_SOFT : Color.WHITE));
+                g2.fill(new RoundRectangle2D.Float(0, 0, w, h, h, h));
+                if (!on) {
+                    g2.setColor(BORDER);
+                    g2.setStroke(new BasicStroke(1.2f));
+                    g2.draw(new RoundRectangle2D.Float(0.6f, 0.6f, w - 1.2f, h - 1.2f, h, h));
+                }
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        button.setFont(font(Font.BOLD, 12));
+        button.setForeground(MUTED);
+        button.setOpaque(false);
+        button.setContentAreaFilled(false);
+        button.setBorderPainted(false);
+        button.setFocusPainted(false);
+        button.setRolloverEnabled(true);
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        button.setBorder(new EmptyBorder(0, 16, 0, 16));
+        button.setPreferredSize(new Dimension(button.getPreferredSize().width, 34));
+        button.addItemListener(e -> button.setForeground(button.isSelected() ? Color.WHITE : MUTED));
+        return button;
     }
 
     /** Text-only button that looks like a link. */

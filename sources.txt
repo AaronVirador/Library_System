@@ -1,11 +1,13 @@
 src/ui/Main.java
 src/ui/LoginFrame.java
+src/ui/ConfirmDialog.java
 src/ui/LibraryGUI.java
 src/ui/Theme.java
 src/service/AuthService.java
 src/service/LibraryService.java
 src/model/User.java
 src/model/Book.java
+src/util/LoginGuard.java
 src/util/PasswordUtil.java
 src/util/FileHandler.java
 src/constants/AppConstants.java

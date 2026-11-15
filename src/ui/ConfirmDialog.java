@@ -58,11 +58,11 @@ public class ConfirmDialog extends JDialog {
         text.add(Box.createVerticalStrut(6));
         text.add(messageLabel);
 
-        JButton cancel = Theme.outlineButton("Cancel");
+        JButton cancel = Buttons.outlineButton("Cancel");
         cancel.setPreferredSize(new Dimension(100, 40));
         cancel.addActionListener(e -> dispose());
 
-        JButton confirm = Theme.dangerSolidButton(confirmText);
+        JButton confirm = Buttons.dangerSolidButton(confirmText);
         confirm.setPreferredSize(new Dimension(110, 40));
         confirm.addActionListener(e -> {
             confirmed = true;

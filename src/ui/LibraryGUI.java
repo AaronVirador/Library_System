@@ -55,13 +55,14 @@ public class LibraryGUI extends JFrame {
         this.username = username;
         this.admin = admin;
 
-        titleField = Theme.withHint(Theme.textField(), "Book title");
-        authorField = Theme.withHint(Theme.textField(), "Author name");
-        searchField = Theme.withHint(Theme.textField(), admin
+        titleField = Inputs.withHint(Inputs.textField(), "Book title");
+        authorField = Inputs.withHint(Inputs.textField(), "Author name");
+        searchField = Inputs.withHint(Inputs.textField(), admin
                 ? "Search title, author or borrower..."
                 : "Search by title or author...");
 
         setTitle(admin ? "Library System - Admin" : "Library System");
+        Logo.applyWindowIcon(this);
         setSize(1100, admin ? 840 : 760);
         setMinimumSize(new Dimension(940, 680));
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -101,10 +102,10 @@ public class LibraryGUI extends JFrame {
 
         JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 14, 0));
         left.setOpaque(false);
-        left.add(Theme.logo(46));
+        left.add(Logo.component(46));
         left.add(names);
 
-        JButton logout = Theme.outlineButton("Log Out");
+        JButton logout = Buttons.outlineButton("Log Out");
         logout.setPreferredSize(new Dimension(100, 38));
         logout.addActionListener(e -> logout());
 
@@ -226,7 +227,7 @@ public class LibraryGUI extends JFrame {
     }
 
     private JPanel statCard(String name, JLabel value, Color dot, Color dotBg) {
-        JPanel card = Theme.card(new BorderLayout(14, 0));
+        JPanel card = Panels.card(new BorderLayout(14, 0));
         card.setBorder(new EmptyBorder(14, 18, 14, 18));
 
         // colored badge on the left
@@ -265,11 +266,11 @@ public class LibraryGUI extends JFrame {
 
     // Card with the "add book" form (admin only)
     private JComponent createAddCard() {
-        JPanel card = Theme.card(new GridBagLayout());
+        JPanel card = Panels.card(new GridBagLayout());
         card.setBorder(new EmptyBorder(16, 20, 18, 20));
         card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 100));
 
-        JButton addButton = Theme.primaryButton("+  Add Book");
+        JButton addButton = Buttons.primaryButton("+  Add Book");
         addButton.setPreferredSize(new Dimension(130, 42));
         addButton.addActionListener(e -> addBook());
         authorField.addActionListener(e -> addButton.doClick()); // Enter key
@@ -294,7 +295,7 @@ public class LibraryGUI extends JFrame {
 
     // Card holding the filters, search bar, table and book count
     private JPanel createTableCard() {
-        JPanel card = Theme.card(new BorderLayout());
+        JPanel card = Panels.card(new BorderLayout());
 
         // title + filter chips
         JLabel tableTitle = new JLabel("Books");
@@ -308,7 +309,7 @@ public class LibraryGUI extends JFrame {
 
         ButtonGroup group = new ButtonGroup();
         for (String name : new String[]{FILTER_ALL, FILTER_AVAILABLE, FILTER_BORROWED}) {
-            JToggleButton chip = Theme.chip(name);
+            JToggleButton chip = Buttons.chip(name);
             chip.addActionListener(e -> {
                 filter = name;
                 refreshTable();
@@ -326,7 +327,7 @@ public class LibraryGUI extends JFrame {
             public void changedUpdate(DocumentEvent e) { refreshTable(); }
         });
 
-        JButton clearButton = Theme.outlineButton("Clear");
+        JButton clearButton = Buttons.outlineButton("Clear");
         clearButton.setPreferredSize(new Dimension(80, 40));
         clearButton.addActionListener(e -> searchField.setText(""));
 
@@ -467,63 +468,13 @@ public class LibraryGUI extends JFrame {
         };
         table.setDefaultRenderer(Object.class, rowRenderer);
         table.setDefaultRenderer(Integer.class, rowRenderer); // the ID column holds numbers
-        table.getColumnModel().getColumn(3).setCellRenderer(new StatusRenderer());
+        table.getColumnModel().getColumn(3).setCellRenderer(new StatusCell());
 
         JScrollPane scrollPane = new JScrollPane(table);
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
         scrollPane.getViewport().setBackground(Color.WHITE);
-        Theme.styleScrollPane(scrollPane);
+        Panels.styleScrollPane(scrollPane);
         return scrollPane;
-    }
-
-    // Shows the status as a small colored pill
-    private static class StatusRenderer implements TableCellRenderer {
-        private final JPanel panel = new JPanel(new GridBagLayout());
-        private final Pill pill = new Pill();
-
-        StatusRenderer() {
-            GridBagConstraints c = new GridBagConstraints();
-            c.anchor = GridBagConstraints.WEST;
-            c.weightx = 1.0; // without this the pill floats to the middle of the cell
-            c.insets = new Insets(0, 20, 0, 0);
-            panel.add(pill, c);
-        }
-
-        @Override
-        public Component getTableCellRendererComponent(JTable t, Object value,
-                boolean isSelected, boolean hasFocus, int row, int col) {
-            boolean available = FILTER_AVAILABLE.equals(value);
-            pill.set(String.valueOf(value),
-                    available ? Theme.PRIMARY_SOFT : Theme.WARNING_BG,
-                    available ? Theme.SUCCESS : Theme.WARNING_TEXT);
-            panel.setBackground(isSelected ? Theme.PRIMARY_SOFT : Color.WHITE);
-            return panel;
-        }
-    }
-
-    private static class Pill extends JLabel {
-        private Color background = Color.LIGHT_GRAY;
-
-        Pill() {
-            setFont(Theme.font(Font.BOLD, 12));
-            setBorder(new EmptyBorder(4, 12, 4, 12));
-            setOpaque(false);
-        }
-
-        void set(String text, Color bg, Color fg) {
-            setText(text);
-            background = bg;
-            setForeground(fg);
-        }
-
-        @Override
-        protected void paintComponent(Graphics g) {
-            Graphics2D g2 = Theme.smooth(g);
-            g2.setColor(background);
-            g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), getHeight(), getHeight()));
-            g2.dispose();
-            super.paintComponent(g);
-        }
     }
 
     // Message pill + action buttons
@@ -535,16 +486,16 @@ public class LibraryGUI extends JFrame {
         buttons.setOpaque(false);
 
         if (admin) {
-            JButton deleteButton = Theme.dangerButton("Delete Selected");
+            JButton deleteButton = Buttons.dangerButton("Delete Selected");
             deleteButton.setPreferredSize(new Dimension(160, 42));
             deleteButton.addActionListener(e -> deleteSelected());
             buttons.add(deleteButton);
         } else {
-            JButton returnButton = Theme.outlineButton("Return Selected");
+            JButton returnButton = Buttons.outlineButton("Return Selected");
             returnButton.setPreferredSize(new Dimension(150, 42));
             returnButton.addActionListener(e -> returnSelected());
 
-            JButton borrowButton = Theme.primaryButton("Borrow Selected");
+            JButton borrowButton = Buttons.primaryButton("Borrow Selected");
             borrowButton.setPreferredSize(new Dimension(160, 42));
             borrowButton.addActionListener(e -> borrowSelected());
 
@@ -562,43 +513,9 @@ public class LibraryGUI extends JFrame {
         return panel;
     }
 
-    // ---------- TOAST (replaces pop-up dialogs) ----------
+    // ---------- TOAST MESSAGES (see Toast.java) ----------
 
     private static final int INFO = 0, SUCCESS = 1, ERROR = 2;
-
-    private static class Toast extends JComponent {
-        private String text = "";
-        private Color dot = Theme.MUTED;
-
-        Toast() {
-            setFont(Theme.font(Font.PLAIN, 13));
-            setVisible(false);
-        }
-
-        void set(String message, Color dotColor) {
-            text = message;
-            dot = dotColor;
-            FontMetrics fm = getFontMetrics(getFont());
-            setPreferredSize(new Dimension(fm.stringWidth(message) + 52, 38));
-            setVisible(true);
-            revalidate();
-            repaint();
-        }
-
-        @Override
-        protected void paintComponent(Graphics g) {
-            Graphics2D g2 = Theme.smooth(g);
-            g2.setColor(new Color(31, 41, 55));
-            g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), getHeight(), getHeight()));
-            g2.setColor(dot);
-            g2.fillOval(16, getHeight() / 2 - 4, 8, 8);
-            g2.setColor(Color.WHITE);
-            g2.setFont(getFont());
-            FontMetrics fm = g2.getFontMetrics();
-            g2.drawString(text, 32, (getHeight() + fm.getAscent() - fm.getDescent()) / 2);
-            g2.dispose();
-        }
-    }
 
     private void showToast(String message, int kind) {
         Color dot = kind == SUCCESS ? new Color(74, 222, 128)
@@ -629,7 +546,7 @@ public class LibraryGUI extends JFrame {
             refreshTable();
             showToast("Book added to the library.", SUCCESS);
         } else {
-            showToast("Fields can't be empty or contain commas.", ERROR);
+            showToast("Enter a title and an author (up to 255 characters each).", ERROR);
         }
     }
 

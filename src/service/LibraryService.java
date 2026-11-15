@@ -1,56 +1,33 @@
 package service;
 
 import constants.AppConstants;
+import dao.BookDAO;
 import model.Book;
-import util.FileHandler;
 
-import java.util.ArrayList;
 import java.util.List;
 
+/** The library rules. The data itself is stored in MySQL (see BookDAO). */
 public class LibraryService {
 
-    private List<Book> books;
+    private static final int MAX_LENGTH = 255; // size of the title / author columns
 
-    public LibraryService() {
-        books = FileHandler.loadBooks();
-    }
+    private final BookDAO bookDAO = new BookDAO();
 
-    // Next ID = highest existing ID + 1
-    private int generateId() {
-        int maxId = 0;
-        for (Book book : books) {
-            if (book.getId() > maxId) {
-                maxId = book.getId();
-            }
-        }
-        return maxId + 1;
-    }
-
-    // Finds a book by its ID, or returns null if not found
-    private Book findById(int id) {
-        for (Book book : books) {
-            if (book.getId() == id) {
-                return book;
-            }
-        }
-        return null;
-    }
-
+    // Returns false if the title or author is empty or too long
     public boolean addBook(String title, String author) {
-        // A comma would break the Book.txt format
+        title = title.trim();
+        author = author.trim();
         if (title.isEmpty() || author.isEmpty()
-                || title.contains(AppConstants.DELIMITER)
-                || author.contains(AppConstants.DELIMITER)) {
+                || title.length() > MAX_LENGTH || author.length() > MAX_LENGTH) {
             return false;
         }
 
-        books.add(new Book(generateId(), title, author));
-        FileHandler.saveBooks(books);
+        bookDAO.insert(title, author);
         return true;
     }
 
     public List<Book> getAllBooks() {
-        return books;
+        return bookDAO.findAll();
     }
 
     // Matches the keyword against title or author (ignores uppercase/lowercase)
@@ -60,35 +37,18 @@ public class LibraryService {
 
     // Same, and the admin can also search by the name of the borrower
     public List<Book> searchBooks(String keyword, boolean includeBorrower) {
-        List<Book> results = new ArrayList<>();
-        String key = keyword.toLowerCase();
-
-        for (Book book : books) {
-            if (book.getTitle().toLowerCase().contains(key)
-                    || book.getAuthor().toLowerCase().contains(key)
-                    || (includeBorrower && book.getBorrowedBy().toLowerCase().contains(key))) {
-                results.add(book);
-            }
-        }
-        return results;
+        return bookDAO.search(keyword, includeBorrower);
     }
 
     // How many books this student currently has
     public int countBorrowedBy(String username) {
-        int count = 0;
-        for (Book book : books) {
-            if (book.getStatus().equals(AppConstants.STATUS_BORROWED)
-                    && book.getBorrowedBy().equalsIgnoreCase(username)) {
-                count++;
-            }
-        }
-        return count;
+        return bookDAO.countBorrowedBy(username);
     }
 
     // Returns a message the UI can show.
     // Messages that start with "You " or "Deleted" mean it worked; anything else means it did not.
     public String borrowBook(int id, String username) {
-        Book book = findById(id);
+        Book book = bookDAO.findById(id);
 
         if (book == null) {
             return "Book not found.";
@@ -96,15 +56,15 @@ public class LibraryService {
         if (book.getStatus().equals(AppConstants.STATUS_BORROWED)) {
             return "Sorry, this book is already borrowed.";
         }
-
-        book.setStatus(AppConstants.STATUS_BORROWED);
-        book.setBorrowedBy(username);
-        FileHandler.saveBooks(books);
+        // the database only changes the row if it is still Available (two people can't take it at once)
+        if (!bookDAO.markBorrowed(id, username)) {
+            return "Sorry, this book is already borrowed.";
+        }
         return "You borrowed \"" + book.getTitle() + "\".";
     }
 
     public String returnBook(int id, String username) {
-        Book book = findById(id);
+        Book book = bookDAO.findById(id);
 
         if (book == null) {
             return "Book not found.";
@@ -113,20 +73,19 @@ public class LibraryService {
             return "This book was not borrowed.";
         }
         // Only the student who borrowed it can return it
-        // (old records with no borrower name can be returned by anyone)
+        // (a borrowed book with no borrower name can be returned by anyone)
         if (!book.getBorrowedBy().isEmpty() && !book.getBorrowedBy().equalsIgnoreCase(username)) {
             return "This book was borrowed by someone else.";
         }
-
-        book.setStatus(AppConstants.STATUS_AVAILABLE);
-        book.setBorrowedBy("");
-        FileHandler.saveBooks(books);
+        if (!bookDAO.markReturned(id)) {
+            return "This book was not borrowed.";
+        }
         return "You returned \"" + book.getTitle() + "\".";
     }
 
     // Admin only (the UI only shows this button to the admin)
     public String deleteBook(int id) {
-        Book book = findById(id);
+        Book book = bookDAO.findById(id);
 
         if (book == null) {
             return "Book not found.";
@@ -135,9 +94,9 @@ public class LibraryService {
             String who = book.getBorrowedBy().isEmpty() ? "a student" : book.getBorrowedBy();
             return "Can't delete: this book is borrowed by " + who + ".";
         }
-
-        books.remove(book);
-        FileHandler.saveBooks(books);
+        if (!bookDAO.deleteIfAvailable(id)) {
+            return "Can't delete: this book was just borrowed.";
+        }
         return "Deleted \"" + book.getTitle() + "\".";
     }
 }

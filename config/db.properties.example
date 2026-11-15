@@ -1,0 +1,7 @@
+# Database settings for the Library System.
+# Keep this file out of anything you share (it contains the database password).
+# Avoid a backslash (\) in the password: this file treats it as a special character.
+
+db.url=jdbc:mysql://localhost:3306/library_db?sslMode=DISABLED&allowPublicKeyRetrieval=true&connectTimeout=5000
+db.user=library_user
+db.password=Aaron123

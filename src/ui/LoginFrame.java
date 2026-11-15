@@ -6,12 +6,7 @@ import util.LoginGuard;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.awt.geom.Ellipse2D;
-import java.awt.geom.Path2D;
-import java.awt.geom.RoundRectangle2D;
-import java.util.function.Supplier;
 
 public class LoginFrame extends JFrame {
 
@@ -20,33 +15,33 @@ public class LoginFrame extends JFrame {
     private JPanel cards = new JPanel(cardLayout);
 
     // Student login fields
-    private JTextField loginUser = Theme.withHint(Theme.textField(), "Enter your username");
-    private JPasswordField loginPass = Theme.withHint(Theme.passwordField(), "Enter your password");
+    private JTextField loginUser = Inputs.withHint(Inputs.textField(), "Enter your username");
+    private JPasswordField loginPass = Inputs.withHint(Inputs.passwordField(), "Enter your password");
     private JLabel loginMsg = Theme.messageLabel();
-    private JButton loginButton = Theme.primaryButton("Log In");
+    private JButton loginButton = Buttons.primaryButton("Log In");
 
     // Admin login fields (the username is fixed)
-    private JTextField adminUser = Theme.textField();
-    private JPasswordField adminPass = Theme.withHint(Theme.passwordField(), "Enter the admin password");
+    private JTextField adminUser = Inputs.textField();
+    private JPasswordField adminPass = Inputs.withHint(Inputs.passwordField(), "Enter the admin password");
     private JLabel adminMsg = Theme.messageLabel();
-    private JButton adminButton = Theme.primaryButton("Log In as Admin");
+    private JButton adminButton = Buttons.primaryButton("Log In as Admin");
 
     // Sign up fields
-    private JTextField signUser = Theme.withHint(Theme.textField(), "Choose a username");
-    private JPasswordField signPass = Theme.passwordField();
-    private JPasswordField signConfirm = Theme.passwordField();
-    private JComboBox<String> signQuestion = Theme.comboBox(AppConstants.SECURITY_QUESTIONS);
-    private JTextField signAnswer = Theme.withHint(Theme.textField(), "Your answer");
+    private JTextField signUser = Inputs.withHint(Inputs.textField(), "Choose a username");
+    private JPasswordField signPass = Inputs.passwordField();
+    private JPasswordField signConfirm = Inputs.passwordField();
+    private JComboBox<String> signQuestion = Inputs.comboBox(AppConstants.SECURITY_QUESTIONS);
+    private JTextField signAnswer = Inputs.withHint(Inputs.textField(), "Your answer");
     private JLabel signMsg = Theme.messageLabel();
 
     // Forgot password fields
-    private JTextField forgotUser = Theme.withHint(Theme.textField(), "Enter your username");
-    private JButton forgotContinue = Theme.primaryButton("Continue");
+    private JTextField forgotUser = Inputs.withHint(Inputs.textField(), "Enter your username");
+    private JButton forgotContinue = Buttons.primaryButton("Continue");
     private JPanel forgotStep2 = new JPanel();
     private JLabel forgotQuestion = new JLabel(" ");
-    private JTextField forgotAnswer = Theme.withHint(Theme.textField(), "Your answer");
-    private JPasswordField forgotNewPass = Theme.passwordField();
-    private JPasswordField forgotConfirm = Theme.passwordField();
+    private JTextField forgotAnswer = Inputs.withHint(Inputs.textField(), "Your answer");
+    private JPasswordField forgotNewPass = Inputs.passwordField();
+    private JPasswordField forgotConfirm = Inputs.passwordField();
     private JLabel forgotMsg = Theme.messageLabel();
 
     // Shows the "wait 30 seconds" countdown and disables the form while locked
@@ -56,6 +51,7 @@ public class LoginFrame extends JFrame {
 
     public LoginFrame() {
         setTitle("Library System - Welcome");
+        Logo.applyWindowIcon(this);
         setSize(980, 700);
         setResizable(false);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -112,7 +108,7 @@ public class LoginFrame extends JFrame {
         text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
         text.setOpaque(false);
 
-        JComponent logo = Theme.logo(150);
+        JComponent logo = Logo.component(150);
         logo.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         JLabel school = new JLabel("Dasmariñas East");
@@ -130,7 +126,7 @@ public class LoginFrame extends JFrame {
         line2.setForeground(new Color(255, 255, 255, 200));
         line2.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel tagline = new JLabel("<html>Where Information Meets Innovation</html>");
+        JLabel tagline = new JLabel("<html>Find, borrow and return books<br>in just a few clicks.</html>");
         tagline.setFont(Theme.font(Font.PLAIN, 14));
         tagline.setForeground(new Color(255, 255, 255, 190));
         tagline.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -187,7 +183,7 @@ public class LoginFrame extends JFrame {
         label.setFont(Theme.font(Font.PLAIN, 13));
         label.setForeground(Theme.MUTED);
 
-        JButton link = Theme.linkButton(linkText);
+        JButton link = Buttons.linkButton(linkText);
         link.addActionListener(e -> showCard(card));
 
         row.add(label);
@@ -215,173 +211,7 @@ public class LoginFrame extends JFrame {
         return p;
     }
 
-    // A big clickable card for choosing a role
-    private static class RoleTile extends JButton {
-        private boolean hover = false;
-        private final String title, description;
-        private final boolean admin;
-
-        RoleTile(String title, String description, boolean admin) {
-            this.title = title;
-            this.description = description;
-            this.admin = admin;
-            setContentAreaFilled(false);
-            setBorderPainted(false);
-            setFocusPainted(false);
-            setOpaque(false);
-            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            setPreferredSize(new Dimension(300, 88));
-            setMaximumSize(new Dimension(Integer.MAX_VALUE, 88));
-            addMouseListener(new MouseAdapter() {
-                @Override
-                public void mouseEntered(MouseEvent e) {
-                    hover = true;
-                    repaint();
-                }
-
-                @Override
-                public void mouseExited(MouseEvent e) {
-                    hover = false;
-                    repaint();
-                }
-            });
-        }
-
-        @Override
-        protected void paintComponent(Graphics g) {
-            Graphics2D g2 = Theme.smooth(g);
-            int w = getWidth(), h = getHeight();
-
-            g2.setColor(hover ? Theme.PRIMARY_SOFT : Color.WHITE);
-            g2.fill(new RoundRectangle2D.Float(0, 0, w, h, 16, 16));
-            g2.setColor(hover ? Theme.PRIMARY : Theme.BORDER);
-            g2.setStroke(new BasicStroke(1.4f));
-            g2.draw(new RoundRectangle2D.Float(0.7f, 0.7f, w - 1.4f, h - 1.4f, 16, 16));
-
-            // icon
-            int d = 52, x = 18, y = (h - d) / 2, cx = x + d / 2;
-            g2.setColor(admin ? Theme.WARNING_BG : Theme.PRIMARY_SOFT);
-            g2.fillOval(x, y, d, d);
-            g2.setColor(admin ? Theme.WARNING_TEXT : Theme.PRIMARY);
-            if (admin) { // shield with a check mark
-                Path2D shield = new Path2D.Float();
-                shield.moveTo(cx, y + 12);
-                shield.lineTo(cx + 11, y + 16);
-                shield.lineTo(cx + 11, y + 27);
-                shield.quadTo(cx + 11, y + 36, cx, y + 41);
-                shield.quadTo(cx - 11, y + 36, cx - 11, y + 27);
-                shield.lineTo(cx - 11, y + 16);
-                shield.closePath();
-                g2.fill(shield);
-                g2.setColor(Theme.WARNING_BG);
-                g2.setStroke(new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                g2.drawLine(cx - 5, y + 26, cx - 1, y + 30);
-                g2.drawLine(cx - 1, y + 30, cx + 6, y + 22);
-            } else { // person
-                g2.fillOval(cx - 6, y + 12, 12, 12);
-                g2.fillArc(cx - 12, y + 28, 24, 24, 0, 180);
-            }
-
-            // texts
-            g2.setFont(Theme.font(Font.BOLD, 16));
-            g2.setColor(Theme.TEXT);
-            g2.drawString(title, 88, h / 2 - 3);
-            g2.setFont(Theme.font(Font.PLAIN, 12));
-            g2.setColor(Theme.MUTED);
-            g2.drawString(description, 88, h / 2 + 16);
-
-            // arrow
-            g2.setColor(hover ? Theme.PRIMARY : Theme.MUTED);
-            g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            g2.drawLine(w - 30, h / 2 - 6, w - 24, h / 2);
-            g2.drawLine(w - 24, h / 2, w - 30, h / 2 + 6);
-            g2.dispose();
-        }
-    }
-
-    // ---------- Lockout countdown ----------
-
-    // Red box that counts down while the account is locked
-    private static class LockPanel extends JPanel {
-        private long millisLeft = 0;
-
-        LockPanel() {
-            setOpaque(false);
-            setPreferredSize(new Dimension(300, 68));
-            setMaximumSize(new Dimension(Integer.MAX_VALUE, 68));
-            setVisible(false);
-        }
-
-        void set(long millisLeft) {
-            this.millisLeft = millisLeft;
-            repaint();
-        }
-
-        @Override
-        protected void paintComponent(Graphics g) {
-            Graphics2D g2 = Theme.smooth(g);
-            int w = getWidth(), h = getHeight();
-
-            g2.setColor(new Color(254, 242, 242));
-            g2.fill(new RoundRectangle2D.Float(0, 0, w, h, 14, 14));
-            g2.setColor(new Color(252, 165, 165));
-            g2.setStroke(new BasicStroke(1.2f));
-            g2.draw(new RoundRectangle2D.Float(0.6f, 0.6f, w - 1.2f, h - 1.2f, 14, 14));
-
-            g2.setFont(Theme.font(Font.BOLD, 13));
-            g2.setColor(new Color(153, 27, 27));
-            g2.drawString("Too many failed attempts", 16, 25);
-            g2.setFont(Theme.font(Font.PLAIN, 12));
-            g2.setColor(new Color(185, 28, 28));
-            g2.drawString("Please wait before trying again.", 16, 43);
-
-            long seconds = (millisLeft + 999) / 1000; // round up so it never shows 0s while locked
-            String time = seconds + "s";
-            g2.setFont(Theme.font(Font.BOLD, 24));
-            g2.setColor(new Color(185, 28, 28));
-            g2.drawString(time, w - 16 - g2.getFontMetrics().stringWidth(time), 36);
-
-            // draining bar
-            int barX = 16, barW = w - 32, barY = h - 12;
-            g2.setColor(new Color(254, 202, 202));
-            g2.fill(new RoundRectangle2D.Float(barX, barY, barW, 4, 4, 4));
-            float ratio = Math.min(1f, millisLeft / (AppConstants.LOCKOUT_SECONDS * 1000f));
-            g2.setColor(new Color(220, 38, 38));
-            g2.fill(new RoundRectangle2D.Float(barX, barY, barW * ratio, 4, 4, 4));
-            g2.dispose();
-        }
-    }
-
-    // Connects one login form to the lock: shows the countdown and disables the inputs
-    private static class LockView {
-        final LockPanel panel = new LockPanel();
-        private final JButton button;
-        private final String buttonText;
-        private final Supplier<String> key; // which account is being logged in
-        private final JComponent[] inputs;
-        private boolean wasLocked = false;
-
-        LockView(JButton button, Supplier<String> key, JComponent... inputs) {
-            this.button = button;
-            this.buttonText = button.getText();
-            this.key = key;
-            this.inputs = inputs;
-        }
-
-        void refresh() {
-            long left = LoginGuard.millisLeft(key.get());
-            boolean locked = left > 0;
-
-            if (locked) panel.set(left);
-            panel.setVisible(locked);
-            button.setEnabled(!locked);
-            button.setText(locked ? "Locked" : buttonText);
-            for (JComponent input : inputs) input.setEnabled(!locked);
-
-            if (wasLocked && !locked) inputs[0].requestFocusInWindow(); // ready to type again
-            wasLocked = locked;
-        }
-    }
+    // ---------- Lockout countdown (see LockView.java) ----------
 
     // ---------- Student login ----------
 
@@ -397,7 +227,7 @@ public class LoginFrame extends JFrame {
         addTo(p, Theme.fieldLabel("Password"), 16);
         addTo(p, loginPass, 8);
 
-        JButton forgot = Theme.linkButton("Forgot password?");
+        JButton forgot = Buttons.linkButton("Forgot password?");
         forgot.addActionListener(e -> showCard("forgot"));
         addTo(p, forgot, 12);
 
@@ -466,7 +296,7 @@ public class LoginFrame extends JFrame {
 
         addTo(p, signMsg, 8);
 
-        JButton createButton = Theme.primaryButton("Create Account");
+        JButton createButton = Buttons.primaryButton("Create Account");
         createButton.addActionListener(e -> doSignUp());
         signAnswer.addActionListener(e -> createButton.doClick());
         addTo(p, createButton, 6);
@@ -505,7 +335,7 @@ public class LoginFrame extends JFrame {
         addTo(forgotStep2, Theme.fieldLabel("Confirm new password"), 14);
         addTo(forgotStep2, forgotConfirm, 6);
 
-        JButton resetButton = Theme.primaryButton("Reset Password");
+        JButton resetButton = Buttons.primaryButton("Reset Password");
         resetButton.addActionListener(e -> doReset());
         forgotConfirm.addActionListener(e -> resetButton.doClick());
         addTo(forgotStep2, resetButton, 16);
@@ -640,6 +470,12 @@ public class LoginFrame extends JFrame {
         forgotNewPass.setText("");
         forgotConfirm.setText("");
         forgotMsg.setText(" ");
+
+        // every password goes back to hidden
+        for (JPasswordField field : new JPasswordField[]{loginPass, adminPass, signPass, signConfirm,
+                forgotNewPass, forgotConfirm}) {
+            Inputs.hidePassword(field);
+        }
 
         cardLayout.show(cards, name);
         studentLock.refresh();

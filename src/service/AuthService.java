@@ -1,28 +1,14 @@
 package service;
 
 import constants.AppConstants;
+import dao.UserDAO;
 import model.User;
-import util.FileHandler;
 import util.PasswordUtil;
 
-import java.util.List;
-
+/** Sign up, log in and password reset. Students are stored in MySQL (see UserDAO). */
 public class AuthService {
 
-    private List<User> users;
-
-    public AuthService() {
-        users = FileHandler.loadUsers();
-    }
-
-    private User findUser(String username) {
-        for (User user : users) {
-            if (user.getUsername().equalsIgnoreCase(username)) {
-                return user;
-            }
-        }
-        return null;
-    }
+    private final UserDAO userDAO = new UserDAO();
 
     // Security answers are not case-sensitive
     private String hashAnswer(String answer) {
@@ -33,22 +19,23 @@ public class AuthService {
     public String signUp(String username, String password, String confirm,
                          String question, String answer) {
         if (username.length() < 3) return "Username must be at least 3 characters.";
+        if (username.length() > 50) return "Username must be 50 characters or less.";
         if (username.contains(AppConstants.DELIMITER) || username.contains(" "))
             return "Username can't contain spaces or commas.";
         if (username.equalsIgnoreCase(AppConstants.ADMIN_USERNAME)) return "That username is reserved.";
-        if (findUser(username) != null) return "That username is already taken.";
+        if (userDAO.findByUsername(username) != null) return "That username is already taken.";
         if (password.length() < 6) return "Password must be at least 6 characters.";
         if (!password.equals(confirm)) return "Passwords do not match.";
         if (answer.trim().isEmpty()) return "Please answer the security question.";
 
-        users.add(new User(username, PasswordUtil.hash(password), question, hashAnswer(answer)));
-        FileHandler.saveUsers(users);
+        User user = new User(username, PasswordUtil.hash(password), question, hashAnswer(answer));
+        if (!userDAO.insert(user)) return "That username is already taken."; // someone else just took it
         return null;
     }
 
     // The username exactly as it was saved at sign-up (so "MARIA" and "maria" count as the same student)
     public String getStoredUsername(String username) {
-        User user = findUser(username);
+        User user = userDAO.findByUsername(username);
         return user == null ? username : user.getUsername();
     }
 
@@ -58,19 +45,19 @@ public class AuthService {
     }
 
     public boolean login(String username, String password) {
-        User user = findUser(username);
+        User user = userDAO.findByUsername(username);
         return user != null && user.getPasswordHash().equals(PasswordUtil.hash(password));
     }
 
     // Returns the user's security question, or null if the account doesn't exist
     public String getSecurityQuestion(String username) {
-        User user = findUser(username);
+        User user = userDAO.findByUsername(username);
         return user == null ? null : user.getQuestion();
     }
 
     // Returns null if OK, otherwise an error message
     public String resetPassword(String username, String answer, String newPassword, String confirm) {
-        User user = findUser(username);
+        User user = userDAO.findByUsername(username);
 
         if (user == null) return "Account not found.";
         if (!user.getAnswerHash().equals(hashAnswer(answer)))
@@ -78,8 +65,7 @@ public class AuthService {
         if (newPassword.length() < 6) return "Password must be at least 6 characters.";
         if (!newPassword.equals(confirm)) return "Passwords do not match.";
 
-        user.setPasswordHash(PasswordUtil.hash(newPassword));
-        FileHandler.saveUsers(users);
+        userDAO.updatePassword(user.getUsername(), PasswordUtil.hash(newPassword));
         return null;
     }
 }

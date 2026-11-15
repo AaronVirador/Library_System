@@ -1,0 +1,15 @@
+# secrets
+config/db.properties
+
+# build output
+bin/
+sources.txt
+*.class
+
+# MySQL driver (download it again from MYSQL_SETUP.md, Step 5)
+lib/*.jar
+
+# editor and OS files
+.vscode/
+.DS_Store
+*.zip
